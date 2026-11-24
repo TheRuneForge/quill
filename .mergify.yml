@@ -1,32 +1,47 @@
-merge_queue:
-  mode: serial
-  max_parallel_checks: 1
-  queue_controls_comment: true
-  status_comments: outcomes
+# GitHub's native merge queue remains authoritative for main.
+# Mergify's merge queue is intentionally not configured here: the active
+# GitHub merge_queue ruleset blocks Mergify merges unless that ruleset is
+# deliberately migrated. Keep one queue responsible for merging.
 
-queue_rules:
-  - name: main
-    merge_method: squash
-    batch_size: 5
-    queue_conditions:
+merge_protections:
+  - name: Quill CI
+    description: Require both application and contact validation before merge.
+    if:
       - base = main
-      - -draft
-    merge_conditions:
-      - base = main
+    success_conditions:
       - check-success = app
       - check-success = kontakter
 
-priority_rules:
-  - name: security-updates
-    conditions:
-      - base = main
-      - label = security
-    priority: high
+merge_protections_settings:
+  post_comment: true
+  reporting_method: check-runs
+  # auto_merge_conditions is intentionally omitted.
+  # GitHub's native merge queue owns the merge decision.
 
 pull_request_rules:
-  - name: automatically queue pull requests
+  - name: label Renovate dependency updates
     conditions:
       - base = main
-      - -draft
+      - author = renovate[bot]
     actions:
-      queue:
+      label:
+        add:
+          - dependencies
+
+  - name: label Dependabot dependency updates
+    conditions:
+      - base = main
+      - author = dependabot[bot]
+    actions:
+      label:
+        add:
+          - dependencies
+
+  - name: label security updates
+    conditions:
+      - base = main
+      - title ~= "(?i)(security|CVE|vulnerability|dependabot alert)"
+    actions:
+      label:
+        add:
+          - security
