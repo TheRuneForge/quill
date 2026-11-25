@@ -2,6 +2,8 @@ from pathlib import Path
 import importlib.util
 import sys
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRAPER = ROOT / "scraper"
 sys.path.insert(0, str(SCRAPER))
@@ -26,8 +28,8 @@ class DummySession:
 
 
 def base_env(monkeypatch):
-    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "account")
-    monkeypatch.setenv("D1_DATABASE_UUID", "database")
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "a" * 32)
+    monkeypatch.setenv("D1_DATABASE_UUID", "b" * 32)
 
 
 def test_d1_client_uses_cloudflare_api_token(monkeypatch):
@@ -54,3 +56,20 @@ def test_old_token_names_do_not_fallback(monkeypatch):
         assert "_W1" not in str(exc)
     else:
         raise AssertionError("old token names must not be accepted")
+
+
+
+def test_d1_client_rejects_invalid_cloudflare_identifiers(monkeypatch):
+    base_env(monkeypatch)
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "account/../other")
+
+    with pytest.raises(ValueError, match="CLOUDFLARE_ACCOUNT_ID"):
+        d1.D1Client(session=DummySession())
+
+    base_env(monkeypatch)
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
+    monkeypatch.setenv("D1_DATABASE_UUID", "database/../other")
+
+    with pytest.raises(ValueError, match="D1_DATABASE_UUID"):
+        d1.D1Client(session=DummySession())

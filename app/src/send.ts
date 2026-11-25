@@ -563,7 +563,7 @@ export async function enqueuePendingUserSendJobs(env: Env): Promise<void> {
     } catch (error) {
       // Ett borttaget mailkonto ska inte få hela cron-körningen att fallera.
       // Jobbet ligger kvar tills användaren väljer ett nytt konto och kör retry.
-      console.warn(`Kunde inte återköa utskick ${job.id}:`, error);
+      console.warn("Kunde inte återköa utskick", { jobId: job.id, error: String(error) });
     }
   }
 }

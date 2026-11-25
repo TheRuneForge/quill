@@ -185,15 +185,13 @@
   }
 
   function attributeValue(attributes, name) {
-    const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = String(attributes).match(
-      new RegExp(
-        `(?:^|\\s)${escaped}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>` + "`" + `]+))`,
-        "i",
-      ),
-    );
-    if (!match) return null;
-    return decodeHtmlEntities(match[1] ?? match[2] ?? match[3] ?? "");
+    const expected = String(name).toLowerCase();
+    const pattern = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\u0060]+))/g;
+    for (const match of String(attributes).matchAll(pattern)) {
+      if (match[1].toLowerCase() !== expected) continue;
+      return decodeHtmlEntities(match[2] ?? match[3] ?? match[4] ?? "");
+    }
+    return null;
   }
 
   function hrefFromAttributes(attributes) {

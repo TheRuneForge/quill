@@ -42,8 +42,12 @@ function json(data: unknown, status = 200): Response {
 }
 function getCookie(req: Request, name: string): string | null {
   const cookie = req.headers.get("Cookie") ?? "";
-  const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? match[1] : null;
+  for (const part of cookie.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
+    return part.slice(separator + 1).trim();
+  }
+  return null;
 }
 function apiKeyRouteAllowed(method: string, pathname: string): boolean {
   if (
