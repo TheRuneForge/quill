@@ -17,6 +17,7 @@ QUILL_ENV_FILE pekar på en. Tokenet behöver bara D1-behörigheten Edit.
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 import requests
@@ -41,6 +42,10 @@ class D1Client:
         self.account_id = _env("CLOUDFLARE_ACCOUNT_ID")
         self.token = _env("CLOUDFLARE_API_TOKEN")
         self.db = _env("D1_DATABASE_UUID", "D1_DATABASE_ID")
+        if not re.fullmatch(r"[0-9a-fA-F]{32}", self.account_id):
+            raise ValueError("CLOUDFLARE_ACCOUNT_ID must be a 32-character hexadecimal ID")
+        if not re.fullmatch(r"[0-9a-fA-F-]{32,36}", self.db) or self.db.count("-") not in {0, 4}:
+            raise ValueError("D1_DATABASE_UUID must be a 32- or 36-character hexadecimal ID")
         self.url = (
             f"https://api.cloudflare.com/client/v4/accounts/{self.account_id}"
             f"/d1/database/{self.db}/query"

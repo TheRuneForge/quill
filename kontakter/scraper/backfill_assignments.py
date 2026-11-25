@@ -29,9 +29,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
-from urllib.request import Request, urlopen
+from urllib.parse import urljoin, urlsplit
+
+import requests
 
 import sources
 
@@ -65,13 +65,20 @@ def load_regioner() -> list[dict]:
 
 
 def fetch(url: str, timeout: int = 30) -> str | None:
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        print("  FEL: ogiltig käll-URL", file=sys.stderr, flush=True)
+        return None
     try:
-        request = Request(url, headers={"User-Agent": "Quill scraper/1.0"})
-        with urlopen(request, timeout=timeout) as response:
-            charset = response.headers.get_content_charset() or "utf-8"
-            return response.read().decode(charset, errors="replace")
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        print(f"  FEL {url}: {exc}", file=sys.stderr, flush=True)
+        response = requests.get(
+            url,
+            headers={"User-Agent": "Quill scraper/1.0"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as exc:
+        print(f"  FEL vid hämtning av {parsed.hostname}: {exc}", file=sys.stderr, flush=True)
         return None
 
 

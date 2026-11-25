@@ -165,8 +165,16 @@ function parseEnv(file) {
     const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
     if (!match) continue;
     let value = match[2];
-    if (value.startsWith("@"))
-      value = readFileSync(resolve(dirname(file), value.slice(1)), "utf8").trimEnd();
+    if (value.startsWith("@")) {
+      const valuesRoot = realpathSync(dirname(resolve(file)));
+      const candidate = resolve(valuesRoot, value.slice(1));
+      const resolved = realpathSync(candidate);
+      const rel = relative(valuesRoot, resolved);
+      if (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel)) {
+        throw new Error("A values-file reference must stay within the values file directory.");
+      }
+      value = readFileSync(resolved, "utf8").trimEnd();
+    }
     values.set(match[1], value.replace(/\\n/g, "\n"));
   }
   return values;

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "sources.example"
@@ -24,7 +25,12 @@ def sources_dir() -> Path:
 
 
 def load(name: str):
-    path = sources_dir() / f"{name}.json"
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+        raise SystemExit("Ogiltigt källnamn: endast bokstäver, siffror, bindestreck och understreck tillåts")
+    root = sources_dir().resolve()
+    path = (root / f"{name}.json").resolve()
+    if path.parent != root:
+        raise SystemExit("Källfilen måste ligga direkt i CONTACT_SOURCES_DIR")
     if not path.is_file():
         raise SystemExit(f"Källfilen saknas: {path} (se {EXAMPLES / (name + '.json')})")
     return json.loads(path.read_text(encoding="utf-8"))
