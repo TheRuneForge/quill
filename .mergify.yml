@@ -25,6 +25,13 @@ queue_rules:
       - check-success = kontakter
 
 pull_request_rules:
+  - name: automatically queue ready pull requests
+    conditions:
+      - base = main
+      - -draft
+    actions:
+      queue:
+
   - name: label Renovate dependency updates
     conditions:
       - base = main
