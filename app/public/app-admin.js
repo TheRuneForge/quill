@@ -143,6 +143,8 @@ async function adminFeedback(force = false) {
   }
   if (!rows.length) host.innerHTML = '<div class="empty">Ingen feedback.</div>';
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function openFeedback() {
   showModal(
     "Kontakt & feedback",
