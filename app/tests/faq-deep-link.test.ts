@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { assertSourceMatch, assertSourceNoMatch } from "./compact-source.ts";
+import { assertSourceMatch } from "./compact-source.ts";
 
 const html = readFileSync(new URL("../public/faq.html", import.meta.url), "utf8");
 const script = readFileSync(new URL("../public/faq.js", import.meta.url), "utf8");

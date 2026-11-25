@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { assertSourceMatch, assertSourceNoMatch, compactCss } from "./compact-source.ts";
+import { assertSourceMatch, compactCss } from "./compact-source.ts";
 
 const publicAsset = (name: string) =>
   readFileSync(new URL("../public/" + name, import.meta.url), "utf8");
