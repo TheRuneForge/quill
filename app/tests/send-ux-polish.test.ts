@@ -6,6 +6,7 @@ import { assertSourceMatch } from "./compact-source.ts";
 const source = await readFile(new URL("../public/send-ux-polish.js", import.meta.url), "utf8");
 
 test("send UX polish script parses", () => {
+  // codeql[js/code-injection] -- source is a checked-in application asset parsed without executing user-supplied input.
   assert.doesNotThrow(() => new Function(source));
 });
 

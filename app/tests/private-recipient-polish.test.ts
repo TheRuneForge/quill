@@ -11,6 +11,7 @@ const source = readFileSync(
 
 function loadParser(): (text: string) => { email: string; name: string }[] {
   const context = createContext({});
+  // codeql[js/code-injection] -- source is a checked-in application asset executed in an isolated test VM.
   new Script(source).runInContext(context);
   return context.parseContactText as (text: string) => { email: string; name: string }[];
 }

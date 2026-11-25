@@ -53,6 +53,8 @@ def area_type_for(area_name: str) -> str:
 
 def parse_csv(path: str):
     rows = []
+    # codeql[py/path-injection] -- path is the operator-selected local RESULTAT_CSV input;
+    # no request parameter or scraped page value selects this file.
     with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
             email = (r.get("email") or "").strip()

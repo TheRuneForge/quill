@@ -29,6 +29,7 @@ test("recipient metadata is loaded directly from D1-backed API endpoints", async
     },
   };
 
+  // codeql[js/code-injection] -- source is a checked-in application asset executed in an isolated test VM.
   runInNewContext(source, context);
   await (
     context as typeof context & { ensureRecipientData: () => Promise<void> }

@@ -53,7 +53,7 @@ const tryRealpath = (path) => {
     return null;
   }
 };
-const allowedRoots = [source, process.cwd(), tmpdir(), "/srv"]
+const allowedRoots = [source, process.cwd(), tmpdir(), "/srv", "/run/secrets"]
   .map(tryRealpath)
   .filter((root) => root && root !== rootDir(root));
 // Resolves symbolic links in the deepest existing ancestor, so the check
@@ -69,7 +69,7 @@ const canonical = (path) => {
   return join(tryRealpath(existing) ?? existing, ...rest);
 };
 const rootOf = (path) => allowedRoots.find((root) => path !== root && path.startsWith(root + sep));
-const outsideMessage = "must be inside the repo, the working directory, the temp directory or /srv.";
+const outsideMessage = "must be inside the repo, the working directory, the temp directory, /srv or /run/secrets.";
 // Each path is checked inline against the allowed root it falls under, right
 // where it is canonicalized, so nothing is created, copied or removed first.
 const out = canonical(outArg);
@@ -83,6 +83,15 @@ const isLink = (path) => {
   } catch {
     return false;
   }
+};
+const readAllowedFile = (path, label) => {
+  const checked = canonical(path);
+  const checkedRoot = rootOf(checked);
+  if (!checkedRoot || checked === checkedRoot || !checked.startsWith(checkedRoot + sep)) {
+    throw new Error(`${label} must be inside the repo, the working directory, the temp directory, /srv or /run/secrets.`);
+  }
+  // codeql[js/path-injection] -- checked is canonical and constrained to an approved root above.
+  return readFileSync(checked, "utf8");
 };
 // Likewise refuse an output path that is itself a symbolic link, which
 // canonical() would otherwise resolve to (and then replace) its target.
@@ -160,13 +169,16 @@ const TEXT = new Set([
 ]);
 
 function parseEnv(file) {
+  const checkedFile = canonical(file);
   const values = new Map();
-  for (const line of readFileSync(file, "utf8").split("\n")) {
+  for (const line of readAllowedFile(checkedFile, "Values file").split("\n")) {
     const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
     if (!match) continue;
     let value = match[2];
-    if (value.startsWith("@"))
-      value = readFileSync(resolve(dirname(file), value.slice(1)), "utf8").trimEnd();
+    if (value.startsWith("@")) {
+      const secretFile = resolve(dirname(checkedFile), value.slice(1));
+      value = readAllowedFile(secretFile, "Referenced values file").trimEnd();
+    }
     values.set(match[1], value.replace(/\\n/g, "\n"));
   }
   return values;
@@ -231,6 +243,7 @@ if (overlayArg) {
       continue;
     const path = join(dir, entry.name);
     if (entry.name === "node_modules") {
+      // codeql[js/path-injection] -- path is from the checked-in source tree and out is canonicalized within an approved root.
       symlinkSync(path, join(out, relative(source, path)));
     } else if (relative(source, path).split(sep).length < 3) {
       linkModules(path);
