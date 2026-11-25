@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { compactCss, assertSourceMatch, assertSourceNoMatch } from "./compact-source.ts";
+import { compactCss, assertSourceMatch } from "./compact-source.ts";
 import test from "node:test";
 
 const script = readFileSync(

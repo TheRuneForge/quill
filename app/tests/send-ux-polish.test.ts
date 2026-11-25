@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { assertSourceMatch, assertSourceNoMatch } from "./compact-source.ts";
+import { assertSourceMatch } from "./compact-source.ts";
 
 const source = await readFile(new URL("../public/send-ux-polish.js", import.meta.url), "utf8");
 

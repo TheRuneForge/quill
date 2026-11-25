@@ -927,7 +927,7 @@ GUESSED_TYPES = {"namnmonster", "namnlista"}
 
 async def main():
     alla_people = {}
-    sources = {}  # område -> region["typ"], för att flagga gissade adresser
+    source_types = {}  # område -> region["typ"], för att flagga gissade adresser
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(
@@ -1008,7 +1008,7 @@ async def main():
 
             if people:
                 alla_people[namn] = people
-                sources[namn] = region["typ"]
+                source_types[namn] = region["typ"]
                 emails = {email for _, email, _, _ in people}
                 safe = namn.replace(" ", "_").replace("/", "-")
                 spara_vcf(namn, emails, f"{OUT_DIR}/{safe}.vcf")
@@ -1038,8 +1038,8 @@ async def main():
         f.write("\n".join(lines))
 
     spara_txt(alla_people, f"{OUT_DIR}/Alla_kommuner_och_regioner.txt")
-    spara_csv(alla_people, sources, f"{OUT_DIR}/Alla_kommuner_och_regioner.csv")
-    spara_gissade(alla_people, sources, f"{OUT_DIR}/gissade_adresser.txt")
+    spara_csv(alla_people, source_types, f"{OUT_DIR}/Alla_kommuner_och_regioner.csv")
+    spara_gissade(alla_people, source_types, f"{OUT_DIR}/gissade_adresser.txt")
 
     log.info(f"Klar. {len(alla)} unika adresser från {len(alla_people)} regioner.")
 

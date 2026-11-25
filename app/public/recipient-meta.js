@@ -41,6 +41,8 @@ function localRecipientEstimate() {
   count -= state.excludeEmails?.size || 0;
   return { count: Math.max(0, count), approximate: true };
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function paintLocalRecipientCount() {
   const estimate = localRecipientEstimate(),
     text = `${estimate.approximate ? "≈ " : ""}${num(estimate.count)} mottagare`;

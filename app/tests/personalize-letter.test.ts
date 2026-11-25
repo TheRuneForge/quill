@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { assertSourceMatch, assertSourceNoMatch } from "./compact-source.ts";
+import { assertSourceMatch } from "./compact-source.ts";
 
 const source = readFileSync(new URL("../src/personalize-letter.ts", import.meta.url), "utf8");
 const queueSource = readFileSync(new URL("../src/send-queue.ts", import.meta.url), "utf8");

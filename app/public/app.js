@@ -5,7 +5,11 @@ const esc = (v) =>
     /[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 const num = (v) => Number(v || 0).toLocaleString("sv-SE");
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 const fmtDate = (v) => (v ? new Date(Number(v)).toLocaleString("sv-SE") : "");
 const state = {
   me: null,
@@ -34,6 +38,8 @@ const state = {
   includeEmails: new Map(),
   excludeEmails: new Map(),
 };
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 const POLICY_AREAS = [
   ["ledning", "Kommun-/regionstyrelse"],
   ["social-omsorg", "Social & omsorg"],
@@ -47,11 +53,15 @@ const POLICY_AREAS = [
   ["regional-utveckling", "Regional utveckling"],
   ["raddning-samhallsskydd", "Räddning & samhällsskydd"],
 ];
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 const MEDIA_CATEGORIES = [
   ["politik", "Politik"],
   ["opinion-debatt", "Opinion & debatt"],
   ["nyhetsredaktion", "Nyhetsredaktion"],
 ];
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 const ACADEMIC_FIELDS = [
   ["political-science", "Statsvetenskap"],
   ["public-administration", "Offentlig förvaltning"],
@@ -255,6 +265,8 @@ function closeModal() {
   document.body.classList.remove("is-locked");
   if (cancel) cancel();
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function openMenu() {
   $("#mobile-menu").hidden = false;
   $("#menu-button").setAttribute("aria-expanded", "true");
@@ -268,6 +280,8 @@ function closeMenu() {
 function route() {
   return location.hash.replace(/^#/, "").split("/").filter(Boolean);
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function applyRoute() {
   const p = route(),
     v = p[0] || "home";
@@ -297,6 +311,8 @@ function go(v) {
   }
   location.hash = next;
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function pageHead(title, lead = "") {
   return `<div class="page-head"><h1>${esc(title)}</h1>${lead ? `<p>${esc(lead)}</p>` : ""}</div>`;
 }
@@ -464,6 +480,8 @@ function beginPublicRoute(id) {
   sessionStorage.setItem("pending:route", id);
   renderAuth();
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function applyPendingPublicAreas() {
   const pending = state.pendingAreaTypes;
   if (!pending) return;
@@ -619,6 +637,8 @@ function forgotPassword() {
     notice("Om adressen finns skickas en återställningslänk.", "success");
   };
 }
+// Shared across classic-script files; references are in the other page scripts.
+// codeql[js/unused-local-variable]
 function renderReset(token) {
   state.publicView = "auth";
   resetShellForAuth();

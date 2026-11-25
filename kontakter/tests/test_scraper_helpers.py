@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 # scraper.py importerar playwright/pypdf; hoppa över lokalt om de saknas.
@@ -62,3 +64,44 @@ def test_profile_urls_must_stay_on_the_trusted_https_host():
     assert sc.is_trusted_profile_url("https://netpublicator.com/politician/1", allowed)
     assert not sc.is_trusted_profile_url("https://evil.example/politician/1", allowed)
     assert not sc.is_trusted_profile_url("http://www.netpublicator.com/politician/1", allowed)
+
+
+def test_main_loads_region_sources_without_shadowing_module(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeContext:
+        async def route(self, *_args):
+            pass
+
+        async def close(self):
+            pass
+
+    class FakeBrowser:
+        async def new_context(self, **_kwargs):
+            return FakeContext()
+
+        async def close(self):
+            pass
+
+    class FakeChromium:
+        async def launch(self, **_kwargs):
+            return FakeBrowser()
+
+    class FakePlaywright:
+        chromium = FakeChromium()
+
+    class FakePlaywrightManager:
+        async def __aenter__(self):
+            return FakePlaywright()
+
+        async def __aexit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(sc, "async_playwright", FakePlaywrightManager)
+    monkeypatch.setattr(sc.sources, "load", lambda name: calls.append(name) or [])
+    monkeypatch.setattr(sc, "OUT_DIR", str(tmp_path))
+
+    asyncio.run(sc.main())
+
+    assert calls == ["regioner"]
+    assert (tmp_path / "Alla_regioner.vcf").is_file()
