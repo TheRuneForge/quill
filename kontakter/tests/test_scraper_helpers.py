@@ -105,3 +105,35 @@ def test_main_loads_region_sources_without_shadowing_module(monkeypatch, tmp_pat
 
     assert calls == ["regioner"]
     assert (tmp_path / "Alla_regioner.vcf").is_file()
+
+
+def test_output_directory_is_confined_to_documented_roots(monkeypatch, tmp_path):
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    assert sc._configured_directory("OUTPUT_DIR", "/output") == str(tmp_path.resolve())
+
+    monkeypatch.setenv("OUTPUT_DIR", "/etc")
+    with pytest.raises(ValueError, match="OUTPUT_DIR"):
+        sc._configured_directory("OUTPUT_DIR", "/output")
+
+
+def test_output_files_must_be_direct_children_of_output_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr(sc, "OUT_DIR", str(tmp_path))
+    allowed = tmp_path / "region.vcf"
+    assert sc._safe_output_file(str(allowed)) == str(allowed)
+
+    with pytest.raises(ValueError, match="Utdatafilen"):
+        sc._safe_output_file(str(tmp_path.parent / "outside.vcf"))
+
+    outside = tmp_path.parent / "outside-target.vcf"
+    outside.write_text("keep", encoding="utf-8")
+    link = tmp_path / "linked.vcf"
+    link.symlink_to(outside)
+    with pytest.raises(ValueError, match="Utdatafilen"):
+        sc._safe_output_file(str(link))
+
+
+def test_scraper_log_values_and_region_filenames_are_safe():
+    assert sc._safe_log_value("logs\r\nforged") == r"logs\r\nforged"
+    filename = sc._safe_filename("../Region/Dalarna")
+    assert "/" not in filename and "\\" not in filename
+    assert not filename.startswith(".")

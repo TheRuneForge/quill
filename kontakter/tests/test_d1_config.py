@@ -26,8 +26,8 @@ class DummySession:
 
 
 def base_env(monkeypatch):
-    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "account")
-    monkeypatch.setenv("D1_DATABASE_UUID", "database")
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "a" * 32)
+    monkeypatch.setenv("D1_DATABASE_UUID", "11111111-1111-1111-1111-111111111111")
 
 
 def test_d1_client_uses_cloudflare_api_token(monkeypatch):
@@ -54,3 +54,32 @@ def test_old_token_names_do_not_fallback(monkeypatch):
         assert "_W1" not in str(exc)
     else:
         raise AssertionError("old token names must not be accepted")
+
+
+def test_d1_client_builds_url_from_validated_identifiers(monkeypatch):
+    base_env(monkeypatch)
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
+
+    client = d1.D1Client(session=DummySession())
+
+    assert client.url == (
+        "https://api.cloudflare.com/client/v4/accounts/"
+        + "a" * 32
+        + "/d1/database/11111111-1111-1111-1111-111111111111/query"
+    )
+
+
+def test_d1_client_rejects_path_and_url_delimiters_in_identifiers(monkeypatch):
+    import pytest
+
+    base_env(monkeypatch)
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "a" * 31 + "/evil")
+    with pytest.raises(ValueError, match="CLOUDFLARE_ACCOUNT_ID"):
+        d1.D1Client(session=DummySession())
+
+    base_env(monkeypatch)
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
+    monkeypatch.setenv("D1_DATABASE_UUID", "11111111-1111-1111-1111-111111111111?x=1")
+    with pytest.raises(ValueError, match="D1_DATABASE_UUID"):
+        d1.D1Client(session=DummySession())

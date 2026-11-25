@@ -17,7 +17,9 @@ QUILL_ENV_FILE pekar på en. Tokenet behöver bara D1-behörigheten Edit.
 from __future__ import annotations
 
 import os
+import re
 import sys
+from urllib.parse import quote
 
 import requests
 
@@ -33,17 +35,35 @@ def _env(*names: str) -> str:
     sys.exit(f"FEL: sätt en av miljövariablerna: {', '.join(names)}")
 
 
+_ACCOUNT_ID = re.compile(r"[0-9a-fA-F]{32}\Z")
+_DATABASE_ID = re.compile(
+    r"(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})\Z"
+)
+
+
+def _url_segment(name: str, value: str, pattern: re.Pattern[str]) -> str:
+    if not pattern.fullmatch(value):
+        raise ValueError(f"FEL: {name} har ogiltigt format")
+    return quote(value, safe="")
+
+
 class D1Client:
     """Tunn wrapper runt D1:s query-endpoint med en återanvänd requests-Session
     (connection pooling för de skript som gör tusentals anrop)."""
 
     def __init__(self, session: requests.Session | None = None):
-        self.account_id = _env("CLOUDFLARE_ACCOUNT_ID")
+        self.account_id = _url_segment(
+            "CLOUDFLARE_ACCOUNT_ID", _env("CLOUDFLARE_ACCOUNT_ID"), _ACCOUNT_ID
+        )
         self.token = _env("CLOUDFLARE_API_TOKEN")
-        self.db = _env("D1_DATABASE_UUID", "D1_DATABASE_ID")
+        self.db = _url_segment(
+            "D1_DATABASE_UUID/D1_DATABASE_ID",
+            _env("D1_DATABASE_UUID", "D1_DATABASE_ID"),
+            _DATABASE_ID,
+        )
         self.url = (
-            f"https://api.cloudflare.com/client/v4/accounts/{self.account_id}"
-            f"/d1/database/{self.db}/query"
+            "https://api.cloudflare.com/client/v4/accounts/"
+            f"{self.account_id}/d1/database/{self.db}/query"
         )
         self.session = session or requests.Session()
         self.session.headers.update(
@@ -53,6 +73,7 @@ class D1Client:
     def run(self, sql: str, params: list | None = None, timeout: int = 30) -> dict:
         """Kör en SQL-sats och returnerar hela result[0]-objektet (results + meta).
         Kastar requests.HTTPError vid HTTP-fel och RuntimeError vid D1-fel."""
+        # codeql[py/partial-ssrf] -- The host is fixed to api.cloudflare.com; both path segments are validated hex/UUID values.
         resp = self.session.post(
             self.url, json={"sql": sql, "params": params or []}, timeout=timeout
         )

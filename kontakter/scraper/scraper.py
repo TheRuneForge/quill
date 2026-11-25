@@ -16,7 +16,9 @@ import os
 import re
 import sys
 import socket
+import tempfile
 import unicodedata
+from pathlib import Path
 import requests
 from io import BytesIO
 from urllib.parse import unquote, urlsplit
@@ -31,10 +33,56 @@ from quill_common import (
     party_anywhere as _extract_party_anywhere,
 )
 
-LOG_DIR  = os.environ.get("LOG_DIR",    "/logs")
-OUT_DIR  = os.environ.get("OUTPUT_DIR", "/output")
+def _configured_directory(name: str, default: str) -> str:
+    raw = os.environ.get(name, default)
+    if not raw or any(ord(char) < 32 or ord(char) == 127 for char in raw):
+        raise ValueError(f"{name} måste vara en giltig katalogsökväg")
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    resolved = candidate.resolve()
+    allowed_roots = (
+        Path.cwd().resolve(),
+        Path(tempfile.gettempdir()).resolve(),
+        Path("/logs"),
+        Path("/output"),
+    )
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise ValueError(
+            f"{name} måste ligga under arbetskatalogen, tempkatalogen, /logs eller /output"
+        )
+    return str(resolved)
+
+
+def _safe_output_file(path: str) -> str:
+    if any(ord(char) < 32 or ord(char) == 127 for char in path):
+        raise ValueError("Utdatafilens sökväg innehåller kontrolltecken")
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    resolved = candidate.resolve()
+    output_root = Path(OUT_DIR).resolve()
+    if resolved.parent != output_root or candidate.is_symlink():
+        raise ValueError("Utdatafilen måste vara en vanlig fil direkt i OUTPUT_DIR")
+    return str(resolved)
+
+
+def _safe_log_value(value: str) -> str:
+    return str(value).replace("\r", "\\r").replace("\n", "\\n")
+
+
+def _safe_filename(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value)
+    safe = re.sub(r"[^\w.-]+", "_", normalized, flags=re.UNICODE)
+    return safe.strip("._") or "region"
+
+
+LOG_DIR = _configured_directory("LOG_DIR", "/logs")
+OUT_DIR = _configured_directory("OUTPUT_DIR", "/output")
+# codeql[py/path-injection] -- _configured_directory canonicalizes both paths and confines them to explicit safe roots.
 os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(OUT_DIR,  exist_ok=True)
+# codeql[py/path-injection] -- _configured_directory canonicalizes both paths and confines them to explicit safe roots.
+os.makedirs(OUT_DIR, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -826,6 +874,7 @@ async def scrape_pdf_lista(context, namn, url, domain):
 
 
 def spara_vcf(namn, emails, path):
+    path = _safe_output_file(path)
     lines = [
         "BEGIN:VCARD",
         "VERSION:3.0",
@@ -836,9 +885,11 @@ def spara_vcf(namn, emails, path):
     for email in sorted(emails):
         lines.append(f"EMAIL;TYPE=WORK:{email}")
     lines.append("END:VCARD")
+    # codeql[py/path-injection] -- path was confined to a direct child of validated OUT_DIR by _safe_output_file.
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
-    log.info(f"Sparad: {path}")
+    # codeql[py/log-injection] -- _safe_log_value escapes CR and LF before logging.
+    log.info(f"Sparad: {_safe_log_value(path)}")
 
 
 def spara_txt(alla_people, path):
@@ -847,6 +898,7 @@ def spara_txt(alla_people, path):
     (ledamöter utan känt namn sorteras in efter sin e-postadress istället).
     Format per rad: 'Namn <email> (PARTI) [Roll]' — parti inom parentes,
     roll inom hakparentes, båda valfria och utelämnas helt om okända."""
+    path = _safe_output_file(path)
     lines = []
     for namn in sorted(alla_people.keys(), key=swedish_key):
         people = alla_people[namn]
@@ -867,9 +919,11 @@ def spara_txt(alla_people, path):
                 lines.append(f"{email}{suffix}")
         lines.append("")
 
+    # codeql[py/path-injection] -- path was confined to a direct child of validated OUT_DIR by _safe_output_file.
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines).rstrip() + "\n")
-    log.info(f"Sparad: {path}")
+    # codeql[py/log-injection] -- _safe_log_value escapes CR and LF before logging.
+    log.info(f"Sparad: {_safe_log_value(path)}")
 
 
 CSV_FIELDS = ["area_name", "name", "email", "party", "role", "source"]
@@ -882,6 +936,8 @@ def spara_csv(alla_people, sources, path):
     'source' anger hur adressen togs fram — 'pattern-guess' för de källor där
     adressen byggts från ett namnmönster och alltså kan vara felaktig/tillhöra
     fel person, 'scraped' för adresser som faktiskt stod på sidan."""
+    path = _safe_output_file(path)
+    # codeql[py/path-injection] -- path was confined to a direct child of validated OUT_DIR by _safe_output_file.
     with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         w.writeheader()
@@ -894,7 +950,8 @@ def spara_csv(alla_people, sources, path):
                     "area_name": area, "name": person_namn, "email": email,
                     "party": party or "", "role": role or "", "source": source,
                 })
-    log.info(f"Sparad: {path}")
+    # codeql[py/log-injection] -- _safe_log_value escapes CR and LF before logging.
+    log.info(f"Sparad: {_safe_log_value(path)}")
 
 
 def spara_gissade(alla_people, sources, path):
@@ -902,6 +959,7 @@ def spara_gissade(alla_people, sources, path):
     och alltså inte verifierats mot en publicerad mailto-länk. Ger operatören en
     överblick över vilka adresser som bör behandlas försiktigt (kan vara
     felstavade eller tillhöra en annan person med liknande namn)."""
+    path = _safe_output_file(path)
     lines = []
     for area in sorted(alla_people.keys(), key=swedish_key):
         if sources.get(area) not in GUESSED_TYPES:
@@ -915,9 +973,11 @@ def spara_gissade(alla_people, sources, path):
         ):
             lines.append(f"{person_namn} <{email}>" if person_namn else email)
         lines.append("")
+    # codeql[py/path-injection] -- path was confined to a direct child of validated OUT_DIR by _safe_output_file.
     with open(path, "w", encoding="utf-8") as f:
         f.write(("\n".join(lines).rstrip() + "\n") if lines else "")
-    log.info(f"Sparad: {path} ({sum(1 for a in alla_people if sources.get(a) in GUESSED_TYPES)} områden)")
+    # codeql[py/log-injection] -- _safe_log_value escapes CR and LF before logging.
+    log.info(f"Sparad: {_safe_log_value(path)} ({sum(1 for a in alla_people if sources.get(a) in GUESSED_TYPES)} områden)")
 
 
 # Typer där e-posten byggs från ett namnmönster (gissning), inte skrapas från en
@@ -1010,8 +1070,8 @@ async def main():
                 alla_people[namn] = people
                 source_types[namn] = region["typ"]
                 emails = {email for _, email, _, _ in people}
-                safe = namn.replace(" ", "_").replace("/", "-")
-                spara_vcf(namn, emails, f"{OUT_DIR}/{safe}.vcf")
+                safe = _safe_filename(namn)
+                spara_vcf(namn, emails, str(Path(OUT_DIR) / f"{safe}.vcf"))
 
             await asyncio.sleep(2)
 
@@ -1034,7 +1094,8 @@ async def main():
         lines.append(f"EMAIL;TYPE=WORK:{email}")
     lines.append("END:VCARD")
 
-    with open(f"{OUT_DIR}/Alla_regioner.vcf", "w", encoding="utf-8") as f:
+    # codeql[py/path-injection] -- the output path is validated as a direct child of OUT_DIR.
+    with open(_safe_output_file(str(Path(OUT_DIR) / "Alla_regioner.vcf")), "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
     spara_txt(alla_people, f"{OUT_DIR}/Alla_kommuner_och_regioner.txt")

@@ -28,6 +28,7 @@ test("send payload deduplicates public and private recipients case-insensitively
   };
   const context: Record<string, unknown> = { state };
 
+  // codeql[js/code-injection] -- source is a checked-in application asset executed in an isolated test VM.
   runInNewContext(source, context);
   const payload = (
     context.filterPayload as () => { includeEmails: string[]; includeRoles: string[] }
@@ -40,6 +41,7 @@ test("send payload deduplicates public and private recipients case-insensitively
 
 test("contact import parser ignores semicolons inside quoted fields", () => {
   const context: Record<string, unknown> = {};
+  // codeql[js/code-injection] -- source is a checked-in application asset executed in an isolated test VM.
   runInNewContext(source, context);
   const parsed = (
     context.parseContactText as (text: string) => Array<{ email: string; name: string }>
