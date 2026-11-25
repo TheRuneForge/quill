@@ -838,7 +838,7 @@ def spara_vcf(namn, emails, path):
     lines.append("END:VCARD")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
-    log.info(f"Sparad: {path}")
+    log.info("Sparad: %r", path)
 
 
 def spara_txt(alla_people, path):
@@ -869,7 +869,7 @@ def spara_txt(alla_people, path):
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines).rstrip() + "\n")
-    log.info(f"Sparad: {path}")
+    log.info("Sparad: %r", path)
 
 
 CSV_FIELDS = ["area_name", "name", "email", "party", "role", "source"]
@@ -894,7 +894,7 @@ def spara_csv(alla_people, sources, path):
                     "area_name": area, "name": person_namn, "email": email,
                     "party": party or "", "role": role or "", "source": source,
                 })
-    log.info(f"Sparad: {path}")
+    log.info("Sparad: %r", path)
 
 
 def spara_gissade(alla_people, sources, path):
@@ -917,7 +917,7 @@ def spara_gissade(alla_people, sources, path):
         lines.append("")
     with open(path, "w", encoding="utf-8") as f:
         f.write(("\n".join(lines).rstrip() + "\n") if lines else "")
-    log.info(f"Sparad: {path} ({sum(1 for a in alla_people if sources.get(a) in GUESSED_TYPES)} områden)")
+    log.info("Sparad: %r (%d områden)", path, sum(1 for a in alla_people if sources.get(a) in GUESSED_TYPES))
 
 
 # Typer där e-posten byggs från ett namnmönster (gissning), inte skrapas från en
@@ -1010,7 +1010,7 @@ async def main():
                 alla_people[namn] = people
                 source_types[namn] = region["typ"]
                 emails = {email for _, email, _, _ in people}
-                safe = namn.replace(" ", "_").replace("/", "-")
+                safe = re.sub(r"[^A-Za-z0-9_-]+", "_", namn).strip("_-") or "region"
                 spara_vcf(namn, emails, f"{OUT_DIR}/{safe}.vcf")
 
             await asyncio.sleep(2)

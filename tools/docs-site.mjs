@@ -22,18 +22,91 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  lstatSync,
+  realpathSync,
+  statSync,
   readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { posix } from "node:path";
+import { basename, dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
+
+const isWithin = (path, root) => {
+  const rel = relative(root, path);
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+};
+
+const assertWithin = (path, root, label, allowRoot = false) => {
+  const rootPrefix = root.endsWith(sep) ? root : `${root}${sep}`;
+  if (path === root && allowRoot) return;
+  if (path === root || !path.startsWith(rootPrefix)) {
+    throw new Error(`${label} must be within the current working directory`);
+  }
+};
+
+const findExistingAncestor = (absolute, root, label, allowRoot = false) => {
+  const rootPrefix = root.endsWith(sep) ? root : `${root}${sep}`;
+  if (
+    (absolute === root && !allowRoot) ||
+    (absolute !== root && !absolute.startsWith(rootPrefix))
+  ) {
+    throw new Error(`${label} must be within the current working directory`);
+  }
+  let existing = absolute;
+  const missing = [];
+  while (true) {
+    try {
+      const canonicalExisting = realpathSync.native(existing);
+      return { canonicalExisting, missing };
+    } catch (error) {
+      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+      const parent = dirname(existing);
+      if (parent === existing) throw error;
+      missing.unshift(basename(existing));
+      existing = parent;
+    }
+  }
+};
+
+const resolveWithin = (root, candidate, label, allowRoot = false) => {
+  if (typeof candidate !== "string" || !candidate.trim() || candidate.split(/[\\/]/).includes("..")) {
+    throw new Error(`${label} must be a relative path without parent-directory segments`);
+  }
+  const absolute = resolve(root, candidate);
+  assertWithin(absolute, root, label, allowRoot);
+  let current = root;
+  for (const component of relative(root, absolute).split(sep).filter(Boolean)) {
+    current = resolve(current, component);
+    try {
+      if (lstatSync(current).isSymbolicLink()) {
+        throw new Error(`${label} must not traverse symbolic links`);
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+      break;
+    }
+  }
+  const { canonicalExisting, missing } = findExistingAncestor(absolute, root, label, allowRoot);
+  const canonicalRoot = realpathSync.native(root);
+  const canonical = resolve(canonicalExisting, ...missing);
+  assertWithin(canonical, canonicalRoot, label, allowRoot);
+  if (relative(absolute, canonical) !== "") {
+    throw new Error(`${label} must not traverse symbolic links`);
+  }
+  return canonical;
+};
+
 
 // --csp-hashes: print the CSP sources ('sha256-...') that allow the inline
 // scripts in the built HTML under <dir>, for a Content-Security-Policy that
 // does not allow inline scripts in general.
 if (process.argv[2] === "--csp-hashes") {
+  const root = realpathSync.native(process.cwd());
+  const scanArg = process.argv[3];
+  if (!scanArg?.trim()) throw new Error("scan directory is required");
+  const scanRoot = resolveWithin(root, scanArg, "scan directory", true);
   const hashes = new Set();
   const scan = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -48,14 +121,29 @@ if (process.argv[2] === "--csp-hashes") {
       }
     }
   };
-  scan(process.argv[3]);
+  scan(scanRoot);
   console.log([...hashes].sort().join(" "));
   process.exit(0);
 }
 
 const wiki = process.argv[2] === "--wiki";
-const out = wiki ? process.argv[3] : "site-docs";
-if (!out) throw new Error("usage: node tools/docs-site.mjs [--wiki <dir>]");
+const outArg = wiki ? process.argv[3] : "site-docs";
+if (!outArg?.trim()) throw new Error("usage: node tools/docs-site.mjs [--wiki <dir>]");
+const root = realpathSync.native(process.cwd());
+const out = resolveWithin(root, outArg, "output directory");
+if (existsSync(out) && !statSync(out).isDirectory()) {
+  throw new Error("output path must be a directory");
+}
+const protectedRoots = [
+  ".claude", ".git", ".github", "apps", "docker", "docs", "kontakter",
+  "migrations", "node_modules", "packages", "test", "tools",
+].flatMap((path) => {
+  const absolute = resolve(root, path);
+  return existsSync(absolute) ? [absolute, realpathSync.native(absolute)] : [absolute];
+});
+if (protectedRoots.some((path) => out === path || isWithin(out, path) || isWithin(path, out))) {
+  throw new Error("output directory must not overlap source directories");
+}
 const config = readFileSync("zensical.toml", "utf8");
 const repoUrl = config.match(/^repo_url\s*=\s*"([^"]+)"/m)?.[1];
 if (!repoUrl) throw new Error("repo_url is missing in zensical.toml");
