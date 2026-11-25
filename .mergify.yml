@@ -1,7 +1,5 @@
-# GitHub's native merge queue remains authoritative on main.
-# Mergify auto-merge is enabled for PRs that satisfy these protections.
-# The repository ruleset must be migrated to Mergify's queue before this
-# configuration can merge automatically.
+# Mergify automatically queues ready PRs once the repository's ruleset
+# is migrated off GitHub's native merge_queue rule.
 
 merge_protections:
   - name: Quill CI
