@@ -64,12 +64,14 @@ def test_d1_client_rejects_invalid_cloudflare_identifiers(monkeypatch):
     monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
     monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "account/../other")
 
+    invalid_account_session = DummySession()
     with pytest.raises(ValueError, match="CLOUDFLARE_ACCOUNT_ID"):
-        d1.D1Client(session=DummySession())
+        d1.D1Client(session=invalid_account_session)
 
     base_env(monkeypatch)
     monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "cf-token")
     monkeypatch.setenv("D1_DATABASE_UUID", "database/../other")
 
+    invalid_database_session = DummySession()
     with pytest.raises(ValueError, match="D1_DATABASE_UUID"):
-        d1.D1Client(session=DummySession())
+        d1.D1Client(session=invalid_database_session)

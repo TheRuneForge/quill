@@ -45,6 +45,7 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger(__name__)
+LOG_SAVED = "Sparad: %r"
 
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
@@ -838,7 +839,7 @@ def spara_vcf(namn, emails, path):
     lines.append("END:VCARD")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
-    log.info("Sparad: %r", path)
+    log.info(LOG_SAVED, path)
 
 
 def spara_txt(alla_people, path):
@@ -869,7 +870,7 @@ def spara_txt(alla_people, path):
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines).rstrip() + "\n")
-    log.info("Sparad: %r", path)
+    log.info(LOG_SAVED, path)
 
 
 CSV_FIELDS = ["area_name", "name", "email", "party", "role", "source"]
@@ -894,7 +895,7 @@ def spara_csv(alla_people, sources, path):
                     "area_name": area, "name": person_namn, "email": email,
                     "party": party or "", "role": role or "", "source": source,
                 })
-    log.info("Sparad: %r", path)
+    log.info(LOG_SAVED, path)
 
 
 def spara_gissade(alla_people, sources, path):

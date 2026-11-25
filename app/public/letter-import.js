@@ -185,11 +185,38 @@
   }
 
   function attributeValue(attributes, name) {
+    const source = String(attributes);
     const expected = String(name).toLowerCase();
-    const pattern = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\u0060]+))/g;
-    for (const match of String(attributes).matchAll(pattern)) {
-      if (match[1].toLowerCase() !== expected) continue;
-      return decodeHtmlEntities(match[2] ?? match[3] ?? match[4] ?? "");
+    const isSpace = (char) => char !== undefined && char.trim() === "";
+    const isUnquotedDelimiter = (char) =>
+      isSpace(char) || char === '"' || char === "'" || char === "=" ||
+      char === "<" || char === ">" || char.charCodeAt(0) === 96;
+    let index = 0;
+
+    while (index < source.length) {
+      while (isSpace(source[index])) index += 1;
+      const nameStart = index;
+      while (index < source.length && source[index] !== "=" && !isSpace(source[index])) index += 1;
+      const attributeName = source.slice(nameStart, index).toLowerCase();
+      while (isSpace(source[index])) index += 1;
+      if (source[index] !== "=") {
+        while (index < source.length && !isSpace(source[index])) index += 1;
+        continue;
+      }
+      index += 1;
+      while (isSpace(source[index])) index += 1;
+
+      const quote = source[index] === '"' || source[index] === "'" ? source[index] : "";
+      if (quote) index += 1;
+      const valueStart = index;
+      while (index < source.length) {
+        const char = source[index];
+        if (quote ? char === quote : isUnquotedDelimiter(char)) break;
+        index += 1;
+      }
+      const value = source.slice(valueStart, index);
+      if (quote && source[index] === quote) index += 1;
+      if (attributeName === expected) return decodeHtmlEntities(value);
     }
     return null;
   }
