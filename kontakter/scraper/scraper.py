@@ -36,6 +36,7 @@ def configured_directory(variable: str, default: str) -> Path:
     value = os.environ.get(variable, default).strip()
     if not value:
         raise ValueError(f"{variable} must be a non-empty directory path")
+    # codeql[py/path-injection] LOG_DIR and OUTPUT_DIR are trusted operator-supplied deployment settings.
     candidate = Path(value).expanduser()
     if not candidate.is_absolute() or ".." in candidate.parts:
         raise ValueError(f"{variable} must be an absolute path without parent-directory segments")

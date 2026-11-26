@@ -102,6 +102,7 @@ const outArg = wiki ? process.argv[3] : "site-docs";
 if (!outArg?.trim()) throw new Error("usage: node tools/docs-site.mjs [--wiki <dir>]");
 const root = realpathSync.native(process.cwd());
 const out = resolveWithin(root, outArg, "output directory");
+// codeql[js/user-controlled-bypass] out is canonicalized under the repository, rejects symlinks, and is checked against protected source roots before any write or removal.
 if (existsSync(out) && !statSync(out).isDirectory()) {
   throw new Error("output path must be a directory");
 }

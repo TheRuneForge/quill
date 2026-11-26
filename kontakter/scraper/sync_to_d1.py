@@ -66,6 +66,7 @@ def parse_csv(path: str):
 
 def load_rows():
     try:
+        # codeql[py/path-injection] RESULTAT_CSV is a trusted operator-supplied deployment setting.
         path = Path(RESULTAT_CSV).expanduser().resolve(strict=True)
     except OSError:
         sys.exit("FEL: resultatfilen saknas. Kör scrapern eller ange RESULTAT_CSV.")
