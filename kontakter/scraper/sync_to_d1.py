@@ -66,11 +66,16 @@ def parse_csv(path: str):
 
 def load_rows():
     try:
-        # lgtm[py/path-injection] RESULTAT_CSV is a trusted operator-supplied deployment setting.
-        # codeql[py/path-injection] RESULTAT_CSV is a trusted operator-supplied deployment setting.
+        # RESULTAT_CSV is an operator-selected result file, not request input.
         path = Path(RESULTAT_CSV).expanduser().resolve(strict=True)
     except OSError:
         sys.exit("FEL: resultatfilen saknas. Kör scrapern eller ange RESULTAT_CSV.")
+    allowed_roots = (Path(__file__).resolve().parent.parent / "resultat", Path("/tmp"))
+    if not any(
+        path == root or str(path).startswith(str(root).rstrip(os.sep) + os.sep)
+        for root in allowed_roots
+    ):
+        sys.exit("FEL: resultatfilen måste ligga i resultatkatalogen eller en temporär testkatalog.")
     if not path.is_file():
         sys.exit("FEL: resultatfilen är inte en vanlig fil.")
     print("Läser resultatfilen")

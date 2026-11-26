@@ -36,16 +36,24 @@ def configured_directory(variable: str, default: str) -> Path:
     value = os.environ.get(variable, default).strip()
     if not value:
         raise ValueError(f"{variable} must be a non-empty directory path")
-    # lgtm[py/path-injection] LOG_DIR and OUTPUT_DIR are trusted operator-supplied deployment settings.
-    # codeql[py/path-injection] LOG_DIR and OUTPUT_DIR are trusted operator-supplied deployment settings.
     candidate = Path(value).expanduser()
-    if not candidate.is_absolute() or ".." in candidate.parts:
-        raise ValueError(f"{variable} must be an absolute path without parent-directory segments")
-    candidate.mkdir(parents=True, exist_ok=True)
-    resolved = candidate.resolve(strict=True)
+    if ".." in candidate.parts:
+        raise ValueError(f"{variable} must not contain parent-directory segments")
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    allowed_roots = (Path.cwd().resolve(), Path("/tmp"), Path("/logs"), Path("/output"))
+    resolved = candidate.resolve(strict=False)
+    if not any(
+        resolved == root or str(resolved).startswith(str(root).rstrip(os.sep) + os.sep)
+        for root in allowed_roots
+    ):
+        raise ValueError(f"{variable} must remain under the working directory, /tmp, /logs, or /output")
+    resolved.mkdir(parents=True, exist_ok=True)
+    resolved = resolved.resolve(strict=True)
     if not resolved.is_dir():
         raise ValueError(f"{variable} must point to a directory")
     return resolved
+
 
 
 LOG_DIR = configured_directory("LOG_DIR", "/logs")

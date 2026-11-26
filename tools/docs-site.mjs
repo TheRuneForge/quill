@@ -103,7 +103,13 @@ if (!outArg?.trim()) throw new Error("usage: node tools/docs-site.mjs [--wiki <d
 const root = realpathSync.native(process.cwd());
 const out = resolveWithin(root, outArg, "output directory");
 // codeql[js/user-controlled-bypass] out is canonicalized under the repository, rejects symlinks, and is checked against protected source roots before any write or removal.
-if (existsSync(out) && !statSync(out).isDirectory()) {
+let outputStat = null;
+try {
+  outputStat = lstatSync(out);
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
+if (outputStat && !outputStat.isDirectory()) {
   throw new Error("output path must be a directory");
 }
 const protectedRoots = [

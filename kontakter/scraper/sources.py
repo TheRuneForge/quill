@@ -21,8 +21,7 @@ def sources_dir() -> Path:
             "CONTACT_SOURCES_DIR är inte satt. Kopiera kontakter/sources.example/ till en "
             "egen katalog utanför repot, fyll i den och peka ut den med CONTACT_SOURCES_DIR."
         )
-    # lgtm[py/path-injection] CONTACT_SOURCES_DIR is trusted operator configuration for external source files.
-    # codeql[py/path-injection] CONTACT_SOURCES_DIR is trusted operator configuration for external source files.
+    # CONTACT_SOURCES_DIR is an operator-selected external data directory, not request input.
     candidate = Path(value).expanduser()
     try:
         root = candidate.resolve(strict=True)
