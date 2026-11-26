@@ -51,7 +51,7 @@ OUT_DIR = configured_directory("OUTPUT_DIR", "/output")
 
 
 def output_path(filename: str) -> Path:
-    if Path(filename).name != filename or filename in {"", ".", ".."}:
+    if not re.fullmatch(r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9]+)?", filename):
         raise ValueError("Output filename must be a single safe path component")
     root = Path(OUT_DIR).resolve()
     path = (root / filename).resolve()
@@ -865,32 +865,24 @@ def spara_vcf(namn, emails, filename):
     log.info("VCF sparad")
 
 
+def _format_person_line(person):
+    person_name, email, party, role = person
+    suffix = (f" ({party})" if party else "") + (f" [{role}]" if role else "")
+    return f"{person_name} <{email}>{suffix}" if person_name else f"{email}{suffix}"
+
+
 def spara_txt(alla_people, filename):
+    """Skriver en läsbar, alfabetiskt sorterad lista över alla kontakter."""
     path = output_path(filename)
-    """Skriver en läsbar lista över samtliga kommuners/regioners förtroendevalda,
-    sorterad alfabetiskt på kommun/region-namn och sedan på ledamotens namn
-    (ledamöter utan känt namn sorteras in efter sin e-postadress istället).
-    Format per rad: 'Namn <email> (PARTI) [Roll]' — parti inom parentes,
-    roll inom hakparentes, båda valfria och utelämnas helt om okända."""
     lines = []
-    for namn in sorted(alla_people.keys(), key=swedish_key):
-        people = alla_people[namn]
-        if not people:
-            continue
-        lines.append(f"## {namn}")
-        for person_namn, email, party, role in sorted(
-            people, key=lambda pe: swedish_key(pe[0] or pe[1])
-        ):
-            suffix = ""
-            if party:
-                suffix += f" ({party})"
-            if role:
-                suffix += f" [{role}]"
-            if person_namn:
-                lines.append(f"{person_namn} <{email}>{suffix}")
-            else:
-                lines.append(f"{email}{suffix}")
-        lines.append("")
+    for area, people in sorted(alla_people.items(), key=lambda item: swedish_key(item[0])):
+        if people:
+            lines.append(f"## {area}")
+            lines.extend(
+                _format_person_line(person)
+                for person in sorted(people, key=lambda pe: swedish_key(pe[0] or pe[1]))
+            )
+            lines.append("")
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines).rstrip() + "\n")
@@ -901,13 +893,13 @@ CSV_FIELDS = ["area_name", "name", "email", "party", "role", "source"]
 
 
 def spara_csv(alla_people, sources, filename):
-    path = output_path(filename)
     """Skriver en maskinläsbar CSV som är den kanoniska överföringsformen till
     sync_to_d1.py (istället för att parsa den människoläsbara .txt:en tillbaka,
     vilket är sprött för namn som själva innehåller '<' eller '(PARTI)').
     'source' anger hur adressen togs fram — 'pattern-guess' för de källor där
     adressen byggts från ett namnmönster och alltså kan vara felaktig/tillhöra
     fel person, 'scraped' för adresser som faktiskt stod på sidan."""
+    path = output_path(filename)
     with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         w.writeheader()
@@ -924,11 +916,11 @@ def spara_csv(alla_people, sources, filename):
 
 
 def spara_gissade(alla_people, sources, filename):
-    path = output_path(filename)
     """Listar de adresser som byggts från namnmönster (typ namnmonster/namnlista)
     och alltså inte verifierats mot en publicerad mailto-länk. Ger operatören en
     överblick över vilka adresser som bör behandlas försiktigt (kan vara
     felstavade eller tillhöra en annan person med liknande namn)."""
+    path = output_path(filename)
     lines = []
     for area in sorted(alla_people.keys(), key=swedish_key):
         if sources.get(area) not in GUESSED_TYPES:
@@ -1061,8 +1053,11 @@ async def main():
         lines.append(f"EMAIL;TYPE=WORK:{email}")
     lines.append("END:VCARD")
 
-    with output_path("Alla_regioner.vcf").open("w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+    await asyncio.to_thread(
+        output_path("Alla_regioner.vcf").write_text,
+        "\n".join(lines),
+        encoding="utf-8",
+    )
 
     spara_txt(alla_people, "Alla_kommuner_och_regioner.txt")
     spara_csv(alla_people, source_types, "Alla_kommuner_och_regioner.csv")
