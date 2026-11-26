@@ -14,7 +14,7 @@ node tools/docs-site.mjs
 rm -rf "$dir/docs"
 cp -r site "$dir/docs"
 if [ -f "$dir/_headers" ]; then
-  hashes=$(node tools/docs-site.mjs --csp-hashes site)
+  hashes=$(node tools/csp-hashes.mjs site)
   cat >>"$dir/_headers" <<RULE
 
 /docs/*

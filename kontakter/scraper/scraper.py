@@ -13,6 +13,7 @@ import csv
 import ipaddress
 import logging
 import os
+from pathlib import Path
 import re
 import sys
 import socket
@@ -31,16 +32,38 @@ from quill_common import (
     party_anywhere as _extract_party_anywhere,
 )
 
-LOG_DIR  = os.environ.get("LOG_DIR",    "/logs")
-OUT_DIR  = os.environ.get("OUTPUT_DIR", "/output")
-os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(OUT_DIR,  exist_ok=True)
+def configured_directory(variable: str, default: str) -> Path:
+    value = os.environ.get(variable, default).strip()
+    if not value:
+        raise ValueError(f"{variable} must be a non-empty directory path")
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError(f"{variable} must be an absolute path without parent-directory segments")
+    candidate.mkdir(parents=True, exist_ok=True)
+    resolved = candidate.resolve(strict=True)
+    if not resolved.is_dir():
+        raise ValueError(f"{variable} must point to a directory")
+    return resolved
+
+
+LOG_DIR = configured_directory("LOG_DIR", "/logs")
+OUT_DIR = configured_directory("OUTPUT_DIR", "/output")
+
+
+def output_path(filename: str) -> Path:
+    if Path(filename).name != filename or filename in {"", ".", ".."}:
+        raise ValueError("Output filename must be a single safe path component")
+    root = Path(OUT_DIR).resolve()
+    path = (root / filename).resolve()
+    if path.parent != root:
+        raise ValueError("Output file must remain inside OUTPUT_DIR")
+    return path
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[
-        logging.FileHandler(f"{LOG_DIR}/scraper.log", encoding="utf-8"),
+        logging.FileHandler(LOG_DIR / "scraper.log", encoding="utf-8"),
         logging.StreamHandler(sys.stdout),
     ],
 )
@@ -825,7 +848,8 @@ async def scrape_pdf_lista(context, namn, url, domain):
     return people
 
 
-def spara_vcf(namn, emails, path):
+def spara_vcf(namn, emails, filename):
+    path = output_path(filename)
     lines = [
         "BEGIN:VCARD",
         "VERSION:3.0",
@@ -838,10 +862,11 @@ def spara_vcf(namn, emails, path):
     lines.append("END:VCARD")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
-    log.info("Sparad: %r", path)
+    log.info("VCF sparad")
 
 
-def spara_txt(alla_people, path):
+def spara_txt(alla_people, filename):
+    path = output_path(filename)
     """Skriver en läsbar lista över samtliga kommuners/regioners förtroendevalda,
     sorterad alfabetiskt på kommun/region-namn och sedan på ledamotens namn
     (ledamöter utan känt namn sorteras in efter sin e-postadress istället).
@@ -869,13 +894,14 @@ def spara_txt(alla_people, path):
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines).rstrip() + "\n")
-    log.info("Sparad: %r", path)
+    log.info("TXT sparad")
 
 
 CSV_FIELDS = ["area_name", "name", "email", "party", "role", "source"]
 
 
-def spara_csv(alla_people, sources, path):
+def spara_csv(alla_people, sources, filename):
+    path = output_path(filename)
     """Skriver en maskinläsbar CSV som är den kanoniska överföringsformen till
     sync_to_d1.py (istället för att parsa den människoläsbara .txt:en tillbaka,
     vilket är sprött för namn som själva innehåller '<' eller '(PARTI)').
@@ -894,10 +920,11 @@ def spara_csv(alla_people, sources, path):
                     "area_name": area, "name": person_namn, "email": email,
                     "party": party or "", "role": role or "", "source": source,
                 })
-    log.info("Sparad: %r", path)
+    log.info("CSV sparad")
 
 
-def spara_gissade(alla_people, sources, path):
+def spara_gissade(alla_people, sources, filename):
+    path = output_path(filename)
     """Listar de adresser som byggts från namnmönster (typ namnmonster/namnlista)
     och alltså inte verifierats mot en publicerad mailto-länk. Ger operatören en
     överblick över vilka adresser som bör behandlas försiktigt (kan vara
@@ -917,7 +944,7 @@ def spara_gissade(alla_people, sources, path):
         lines.append("")
     with open(path, "w", encoding="utf-8") as f:
         f.write(("\n".join(lines).rstrip() + "\n") if lines else "")
-    log.info("Sparad: %r (%d områden)", path, sum(1 for a in alla_people if sources.get(a) in GUESSED_TYPES))
+    log.info("Gissade adresser sparade")
 
 
 # Typer där e-posten byggs från ett namnmönster (gissning), inte skrapas från en
@@ -1011,7 +1038,7 @@ async def main():
                 source_types[namn] = region["typ"]
                 emails = {email for _, email, _, _ in people}
                 safe = re.sub(r"[^A-Za-z0-9_-]+", "_", namn).strip("_-") or "region"
-                spara_vcf(namn, emails, f"{OUT_DIR}/{safe}.vcf")
+                spara_vcf(namn, emails, safe + ".vcf")
 
             await asyncio.sleep(2)
 
@@ -1034,12 +1061,12 @@ async def main():
         lines.append(f"EMAIL;TYPE=WORK:{email}")
     lines.append("END:VCARD")
 
-    with open(f"{OUT_DIR}/Alla_regioner.vcf", "w", encoding="utf-8") as f:
+    with output_path("Alla_regioner.vcf").open("w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
-    spara_txt(alla_people, f"{OUT_DIR}/Alla_kommuner_och_regioner.txt")
-    spara_csv(alla_people, source_types, f"{OUT_DIR}/Alla_kommuner_och_regioner.csv")
-    spara_gissade(alla_people, source_types, f"{OUT_DIR}/gissade_adresser.txt")
+    spara_txt(alla_people, "Alla_kommuner_och_regioner.txt")
+    spara_csv(alla_people, source_types, "Alla_kommuner_och_regioner.csv")
+    spara_gissade(alla_people, source_types, "gissade_adresser.txt")
 
     log.info(f"Klar. {len(alla)} unika adresser från {len(alla_people)} regioner.")
 

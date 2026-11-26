@@ -9,6 +9,7 @@ sparas inte i public_contacts; nämnd/organ hanteras separat.
 
 import csv
 import os
+from pathlib import Path
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -64,10 +65,14 @@ def parse_csv(path: str):
 
 
 def load_rows():
-    if not os.path.exists(RESULTAT_CSV):
-        sys.exit(f"FEL: {RESULTAT_CSV} saknas. Kör scrapern eller ange RESULTAT_CSV.")
-    print(f"Läser {RESULTAT_CSV}")
-    return parse_csv(RESULTAT_CSV)
+    try:
+        path = Path(RESULTAT_CSV).expanduser().resolve(strict=True)
+    except OSError:
+        sys.exit("FEL: resultatfilen saknas. Kör scrapern eller ange RESULTAT_CSV.")
+    if not path.is_file():
+        sys.exit("FEL: resultatfilen är inte en vanlig fil.")
+    print("Läser resultatfilen")
+    return parse_csv(path)
 
 
 def upsert_row(client: D1Client, row) -> tuple[bool, str]:

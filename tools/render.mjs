@@ -41,6 +41,27 @@ if (!valuesFile || !outArg) {
   process.exit(2);
 }
 const source = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+const resolveValuesFile = (candidate) => {
+  const path = realpathSync(resolve(candidate));
+  const roots = [source, process.cwd(), tmpdir()]
+    .map((root) => {
+      try {
+        return realpathSync(root);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  const allowed = roots.some((root) => {
+    const rel = relative(root, path);
+    return rel === "" || (rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel));
+  });
+  if (!allowed || !lstatSync(path).isFile()) {
+    throw new Error("values file must be an existing file inside the repository, working directory, or system temp directory");
+  }
+  return path;
+};
+
 // Output and overlay paths must stay strictly beneath the repo, the working
 // directory, the system temp directory or /srv (the container's site
 // directory), so a mistyped argument cannot make this script write, copy or
@@ -188,7 +209,7 @@ const values =
           .filter((name) => name in process.env)
           .map((name) => [name, process.env[name].replace(/\\n/g, "\n")]),
       )
-    : parseEnv(valuesFile);
+    : parseEnv(resolveValuesFile(valuesFile));
 const missing = declared.filter((name) => !values.has(name));
 if (missing.length) {
   console.error(

@@ -21,7 +21,14 @@ def sources_dir() -> Path:
             "CONTACT_SOURCES_DIR är inte satt. Kopiera kontakter/sources.example/ till en "
             "egen katalog utanför repot, fyll i den och peka ut den med CONTACT_SOURCES_DIR."
         )
-    return Path(value).expanduser()
+    candidate = Path(value).expanduser()
+    try:
+        root = candidate.resolve(strict=True)
+    except OSError as error:
+        raise SystemExit("CONTACT_SOURCES_DIR måste peka på en befintlig katalog") from error
+    if not root.is_dir():
+        raise SystemExit("CONTACT_SOURCES_DIR måste peka på en katalog")
+    return root
 
 
 def load(name: str):
