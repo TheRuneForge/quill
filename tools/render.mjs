@@ -56,10 +56,12 @@ const resolveValuesFile = (candidate) => {
     const rel = relative(root, path);
     return rel === "" || (rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel));
   });
-  // codeql[js/path-injection] The canonical path is checked against real repository, cwd, and temp roots before this file check.
+  // lgtm[js/path-injection] The canonical path is checked against trusted roots before this file check.
+  // codeql[js/path-injection] The canonical path is checked against trusted roots before this file check.
   if (!allowed || !lstatSync(path).isFile()) {
     throw new Error("values file must be an existing file inside the repository, working directory, or system temp directory");
   }
+  // lgtm[js/path-injection] Only the canonical, root-validated file path is returned to the parser.
   // codeql[js/path-injection] Only the canonical, root-validated file path is returned to the parser.
   return path;
 };
