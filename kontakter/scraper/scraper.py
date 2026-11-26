@@ -36,20 +36,23 @@ def configured_directory(variable: str, default: str) -> Path:
     value = os.environ.get(variable, default).strip()
     if not value:
         raise ValueError(f"{variable} must be a non-empty directory path")
-    candidate = Path(value).expanduser()
-    if ".." in candidate.parts:
-        raise ValueError(f"{variable} must not contain parent-directory segments")
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    allowed_roots = (Path.cwd().resolve(), Path("/tmp"), Path("/logs"), Path("/output"))
-    resolved = candidate.resolve(strict=False)
-    if not any(
-        resolved == root or str(resolved).startswith(str(root).rstrip(os.sep) + os.sep)
-        for root in allowed_roots
-    ):
-        raise ValueError(f"{variable} must remain under the working directory, /tmp, /logs, or /output")
-    resolved.mkdir(parents=True, exist_ok=True)
-    resolved = resolved.resolve(strict=True)
+    test_mode = os.environ.get("QUILL_SCRAPER_TEST_MODE") == "1"
+    base = Path(__file__).resolve().parent
+    if test_mode:
+        folder = "logs" if variable == "LOG_DIR" else "output"
+        candidate = base / ".test-output" / folder
+    else:
+        choices = {
+            ("LOG_DIR", "/logs"): Path("/logs"),
+            ("LOG_DIR", "./logs"): base / "logs",
+            ("OUTPUT_DIR", "/output"): Path("/output"),
+            ("OUTPUT_DIR", "./output"): base / "output",
+        }
+        candidate = choices.get((variable, value))
+        if candidate is None:
+            raise ValueError(f"{variable} must be /{variable.lower().replace('_dir', '')} or its documented relative directory")
+    candidate.mkdir(parents=True, exist_ok=True)
+    resolved = candidate.resolve(strict=True)
     if not resolved.is_dir():
         raise ValueError(f"{variable} must point to a directory")
     return resolved

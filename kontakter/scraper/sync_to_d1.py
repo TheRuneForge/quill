@@ -8,7 +8,6 @@ sparas inte i public_contacts; nämnd/organ hanteras separat.
 """
 
 import csv
-import os
 from pathlib import Path
 import sys
 import time
@@ -19,10 +18,8 @@ import requests
 from d1 import D1Client
 from quill_common import normalize_party
 
-RESULTAT_CSV = os.environ.get(
-    "RESULTAT_CSV",
-    os.path.join(os.path.dirname(__file__), "..", "resultat", "Alla_kommuner_och_regioner.csv"),
-)
+RESULTAT_DIR = Path(__file__).resolve().parent.parent / "resultat"
+RESULTAT_CSV = RESULTAT_DIR / "Alla_kommuner_och_regioner.csv"
 MAX_WORKERS = 10
 
 UPSERT_SQL = (
@@ -66,16 +63,12 @@ def parse_csv(path: str):
 
 def load_rows():
     try:
-        # RESULTAT_CSV is an operator-selected result file, not request input.
-        path = Path(RESULTAT_CSV).expanduser().resolve(strict=True)
+        path = Path(RESULTAT_CSV).resolve(strict=True)
     except OSError:
         sys.exit("FEL: resultatfilen saknas. Kör scrapern eller ange RESULTAT_CSV.")
-    allowed_roots = (Path(__file__).resolve().parent.parent / "resultat", Path("/tmp"))
-    if not any(
-        path == root or str(path).startswith(str(root).rstrip(os.sep) + os.sep)
-        for root in allowed_roots
-    ):
-        sys.exit("FEL: resultatfilen måste ligga i resultatkatalogen eller en temporär testkatalog.")
+    root = RESULTAT_DIR.resolve()
+    if path.parent != root:
+        sys.exit("FEL: resultatfilen måste ligga direkt i resultatkatalogen.")
     if not path.is_file():
         sys.exit("FEL: resultatfilen är inte en vanlig fil.")
     print("Läser resultatfilen")

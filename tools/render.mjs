@@ -42,18 +42,15 @@ if (!valuesFile || !outArg) {
 }
 const source = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const resolveValuesFile = (candidate) => {
-  const path = realpathSync(resolve(candidate));
+  const absolute = resolve(candidate);
   const roots = [source, process.cwd(), tmpdir()]
-    .map((root) => {
-      try {
-        return realpathSync(root);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-  const allowed = roots.some((root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep));
-  if (!allowed || !lstatSync(path).isFile()) {
+    .map((root) => resolve(root));
+  const isWithinRoot = (path, root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
+  if (!roots.some((root) => isWithinRoot(absolute, root))) {
+    throw new Error("values file must be inside the repository, working directory, or system temp directory");
+  }
+  const path = realpathSync(absolute);
+  if (!roots.some((root) => isWithinRoot(path, root)) || !lstatSync(path).isFile()) {
     throw new Error("values file must be an existing file inside the repository, working directory, or system temp directory");
   }
   return path;
