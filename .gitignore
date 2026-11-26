@@ -615,3 +615,6 @@ __pycache__/
 
 # Local Claude Code statusline script, kept outside the repository
 statusline.sh
+
+# node:test JUnit reports written in CI for Mergify Test Engine
+node-test-results/

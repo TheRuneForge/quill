@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,6 +18,17 @@ concurrency:
 jobs:
   app:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      # node:test writes a JUnit report per test run for Mergify Test Engine,
+      # next to its usual spec output.
+      NODE_TEST_JUNIT_DIR: ${{ github.workspace }}/node-test-results
+      NODE_TEST_JUNIT_OPTIONS: >-
+        --test-reporter=spec --test-reporter-destination=stdout
+        --test-reporter=${{ github.workspace }}/tools/node-test-junit-reporter.mjs
+        --test-reporter-destination=stdout
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -28,14 +38,30 @@ jobs:
           node-version: 26
       - run: npm ci
         working-directory: app
-      - run: npm run validate
+      - id: validate
+        run: npm run validate
         working-directory: app
+        env:
+          NODE_OPTIONS: ${{ env.NODE_TEST_JUNIT_OPTIONS }}
       - run: sh tools/deploy.sh cloudflare.example.env --dry-run
-      - run: node --test tools/*.test.mjs
+      - id: tools-tests
+        run: node --test tools/*.test.mjs
+        env:
+          NODE_OPTIONS: ${{ env.NODE_TEST_JUNIT_OPTIONS }}
       - run: node tools/check-addresses.mjs
+      - name: Mergify Test Engine Upload
+        if: (success() || failure()) && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository) && hashFiles('node-test-results/junit-*.xml') != ''
+        uses: mergifyio/gha-mergify-ci@v30
+        with:
+          report_path: node-test-results/junit-*.xml
+          mergify_cli_version: 2026.11.22
+          test_step_outcome: ${{ (steps.validate.outcome == 'failure' || steps.tools-tests.outcome == 'failure') && 'failure' || 'success' }}
 
   kontakter:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         working-directory: kontakter
