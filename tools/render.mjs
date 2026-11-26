@@ -45,13 +45,16 @@ const resolveValuesFile = (candidate) => {
   const absolute = resolve(candidate);
   const roots = [source, process.cwd(), tmpdir()]
     .map((root) => resolve(root));
-  const isWithinRoot = (path, root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
-  if (!roots.some((root) => isWithinRoot(absolute, root))) {
+  if (!roots.some((root) => absolute === root || absolute.startsWith(root.endsWith(sep) ? root : root + sep))) {
     throw new Error("values file must be inside the repository, working directory, or system temp directory");
   }
   const path = realpathSync(absolute);
-  if (!roots.some((root) => isWithinRoot(path, root)) || !lstatSync(path).isFile()) {
-    throw new Error("values file must be an existing file inside the repository, working directory, or system temp directory");
+  if (!roots.some((root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep))) {
+    throw new Error("values file must resolve inside the repository, working directory, or system temp directory");
+  }
+  const fileStat = lstatSync(path);
+  if (!fileStat.isFile()) {
+    throw new Error("values file must be an existing regular file");
   }
   return path;
 };
