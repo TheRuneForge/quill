@@ -615,3 +615,6 @@ __pycache__/
 
 # Local Claude Code statusline script, kept outside the repository
 statusline.sh
+
+# Temporary scraper test output
+kontakter/scraper/.test-output/

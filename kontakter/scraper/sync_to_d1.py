@@ -8,7 +8,7 @@ sparas inte i public_contacts; nämnd/organ hanteras separat.
 """
 
 import csv
-import os
+from pathlib import Path
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,10 +18,8 @@ import requests
 from d1 import D1Client
 from quill_common import normalize_party
 
-RESULTAT_CSV = os.environ.get(
-    "RESULTAT_CSV",
-    os.path.join(os.path.dirname(__file__), "..", "resultat", "Alla_kommuner_och_regioner.csv"),
-)
+RESULTAT_DIR = Path(__file__).resolve().parent.parent / "resultat"
+RESULTAT_CSV = RESULTAT_DIR / "Alla_kommuner_och_regioner.csv"
 MAX_WORKERS = 10
 
 UPSERT_SQL = (
@@ -64,10 +62,17 @@ def parse_csv(path: str):
 
 
 def load_rows():
-    if not os.path.exists(RESULTAT_CSV):
-        sys.exit(f"FEL: {RESULTAT_CSV} saknas. Kör scrapern eller ange RESULTAT_CSV.")
-    print(f"Läser {RESULTAT_CSV}")
-    return parse_csv(RESULTAT_CSV)
+    try:
+        path = Path(RESULTAT_CSV).resolve(strict=True)
+    except OSError:
+        sys.exit("FEL: resultatfilen saknas. Kör scrapern eller ange RESULTAT_CSV.")
+    root = RESULTAT_DIR.resolve()
+    if path.parent != root:
+        sys.exit("FEL: resultatfilen måste ligga direkt i resultatkatalogen.")
+    if not path.is_file():
+        sys.exit("FEL: resultatfilen är inte en vanlig fil.")
+    print("Läser resultatfilen")
+    return parse_csv(path)
 
 
 def upsert_row(client: D1Client, row) -> tuple[bool, str]:

@@ -37,13 +37,17 @@ def test_parse_csv_ignores_detailed_role(tmp_path):
 
 
 def test_load_rows_reads_csv(tmp_path, monkeypatch):
-    csv_path = tmp_path / "r.csv"
+    s.RESULTAT_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = s.RESULTAT_DIR / f"{tmp_path.name}.csv"
     csv_path.write_text("area_name,name,email,party,role,source\nX kommun,A B,a@x.example,,,scraped\n", encoding="utf-8")
-    monkeypatch.setattr(s, "RESULTAT_CSV", str(csv_path))
-    assert s.load_rows() == [("A B", "a@x.example", "X kommun", "kommun", None)]
+    monkeypatch.setattr(s, "RESULTAT_CSV", csv_path)
+    try:
+        assert s.load_rows() == [("A B", "a@x.example", "X kommun", "kommun", None)]
+    finally:
+        csv_path.unlink(missing_ok=True)
 
 
 def test_load_rows_exits_when_csv_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(s, "RESULTAT_CSV", str(tmp_path / "missing.csv"))
+    monkeypatch.setattr(s, "RESULTAT_CSV", s.RESULTAT_DIR / f"{tmp_path.name}-missing.csv")
     with pytest.raises(SystemExit):
         s.load_rows()
