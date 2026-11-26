@@ -48,13 +48,14 @@ const resolveValuesFile = (candidate) => {
   if (!roots.some((root) => absolute === root || absolute.startsWith(root.endsWith(sep) ? root : root + sep))) {
     throw new Error("values file must be inside the repository, working directory, or system temp directory");
   }
-  const path = realpathSync(absolute);
+  let path;
+  try {
+    path = realpathSync(absolute);
+  } catch {
+    throw new Error("values file must be an existing file inside the repository, working directory, or system temp directory");
+  }
   if (!roots.some((root) => path === root || path.startsWith(root.endsWith(sep) ? root : root + sep))) {
     throw new Error("values file must resolve inside the repository, working directory, or system temp directory");
-  }
-  const fileStat = lstatSync(path);
-  if (!fileStat.isFile()) {
-    throw new Error("values file must be an existing regular file");
   }
   return path;
 };
